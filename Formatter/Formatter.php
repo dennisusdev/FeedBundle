@@ -12,6 +12,7 @@ namespace Eko\FeedBundle\Formatter;
 
 use Eko\FeedBundle\Feed\Feed;
 use Eko\FeedBundle\Field\Channel\GroupChannelField;
+use Eko\FeedBundle\Field\Item\GroupItemField;
 use Eko\FeedBundle\Field\Item\ItemFieldInterface;
 use Eko\FeedBundle\Field\Item\MediaItemField;
 use Eko\FeedBundle\Item\Writer\ItemInterface;
@@ -97,11 +98,16 @@ class Formatter
 
                 foreach ($field->getItemFields() as $childField) {
                     $child = $this->dom->createElement($childField->getName(), $childField->getValue());
+
+                    $this->addAttributes($child, $childField);
+
                     $parent->appendChild($child);
                 }
             } else {
                 $parent = $this->dom->createElement($field->getName(), $field->getValue());
             }
+
+            $this->addAttributes($parent, $field);
 
             $channel->appendChild($parent);
         }
@@ -137,15 +143,17 @@ class Formatter
     /**
      * Format a group item field
      *
-     * @param ItemFieldInterface $field An item field instance
-     * @param ItemInterface      $item  An entity instance
+     * @param GroupItemField $field An item field instance
+     * @param ItemInterface  $item  An entity instance
      *
      * @return \DOMElement
      */
-    protected function formatGroupItemField(ItemFieldInterface $field, ItemInterface $item)
+    protected function formatGroupItemField(GroupItemField $field, ItemInterface $item)
     {
         $name = $field->getName();
         $element = $this->dom->createElement($name);
+
+        $this->addAttributes($element, $field, $item);
 
         $itemFields = $field->getItemFields();
 
@@ -204,6 +212,8 @@ class Formatter
             $elementName = $elementName[$this->getName()];
 
             $element = $this->dom->createElement($elementName);
+
+            $this->addAttributes($element, $field, $item);
 
             switch ($this->getName()) {
                 case 'rss':
@@ -299,7 +309,28 @@ class Formatter
             $element = $this->dom->createElement($name, $value);
         }
 
+        $this->addAttributes($element, $field, $item);
+
         return $element;
+    }
+
+    /**
+     * Add field attributes to a DOM element
+     *
+     * @param \DOMElement        $element A XML DOM element
+     * @param ItemFieldInterface $field   A feed field instance
+     * @param ItemInterface|null $item    A feed item instance
+     */
+    protected function addAttributes(\DOMElement $element, ItemFieldInterface $field, ItemInterface $item = null)
+    {
+        foreach ($field->getAttributes() as $key => $value) {
+            if ($item) {
+                $key   = method_exists($item, $key) ? call_user_func(array($item, $key)) : $key;
+                $value = method_exists($item, $value) ? call_user_func(array($item, $value)) : $value;
+            }
+
+            $element->setAttribute($key, $value);
+        }
     }
 
     /**
